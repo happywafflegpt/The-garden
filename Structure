@@ -1,0 +1,9 @@
+garden_game/
+├── app.py
+├── templates/
+│   ├── layout.html
+│   ├── index.html
+│   └── garden.html
+├── static/
+│   └── main.js
+└── garden.db
