@@ -1,0 +1,41 @@
+{% extends 'layout.html' %}
+{% block content %}
+  <h2>Garden: {{ username }}</h2>
+  <div>Coins: <span id="coins">{{ coins }}</span></div>
+  <div id="garden-grid">
+    {% for row in garden %}
+      <div class="row">
+        {% for cell in row %}
+          <div class="cell" data-row="{{ loop.index0 }}" data-col="{{ loop.index0 }}">
+            {% if cell %}
+              {{ cell.seed }} ({{ cell.growth }}/{{ seed_data[cell.seed].growth_time }})
+            {% else %}
+              Empty
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <div>
+    <h3>Actions</h3>
+    <select id="seed-select">
+      {% for key, sd in seed_data.items() %}
+        <option value="{{ key }}">{{ sd.name }} ({{ sd.rarity }}) - {{ sd.cost }}c</option>
+      {% endfor %}
+    </select>
+    <button id="plant-btn">Plant</button>
+    <button id="water-btn">Water All</button>
+    <button id="harvest-btn">Harvest</button>
+  </div>
+
+  <hr>
+
+  <div>
+    <h3>Visit Friend's Garden</h3>
+    <input id="visit-username" placeholder="Friend's username">
+    <button id="visit-btn">Visit</button>
+    <div id="friend-garden"></div>
+  </div>
+{% endblock %}
