@@ -1,0 +1,116 @@
+from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask_sqlalchemy import SQLAlchemy
+
+app = Flask(__name__)
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///garden.db"
+db = SQLAlchemy(app)
+
+# --- Data Models ---
+
+class User(db.Model):
+    username = db.Column(db.String(80), primary_key=True)
+    coins = db.Column(db.Integer, default=20)
+
+class Plot(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), db.ForeignKey('user.username'))
+    row = db.Column(db.Integer)
+    col = db.Column(db.Integer)
+    seed = db.Column(db.String(80), nullable=True)
+    growth = db.Column(db.Integer, default=0)
+
+# --- Seed Data and Prices ---
+
+seed_data = {
+    "carrot_seed": {"name": "Carrot", "rarity": "Common", "growth_time": 2, "cost": 5},
+    "tomato_seed": {"name": "Tomato", "rarity": "Common", "growth_time": 3, "cost": 6},
+    "rose_seed": {"name": "Rose", "rarity": "Rare", "growth_time": 4, "cost": 10},
+    "sunflower_seed": {"name": "Sunflower", "rarity": "Epic", "growth_time": 5, "cost": 15},
+    "dragonfruit_seed": {"name": "Dragonfruit", "rarity": "Mythical", "growth_time": 6, "cost": 25},
+}
+
+# --- Routes ---
+
+@app.before_first_request
+def setup_db():
+    db.create_all()
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        username = request.form["username"]
+        if not User.query.get(username):
+            db.session.add(User(username=username))
+            # initialize plots 3x3
+            for r in range(3):
+                for c in range(3):
+                    db.session.add(Plot(username=username, row=r, col=c))
+            db.session.commit()
+        return redirect(url_for("view_garden", username=username))
+    return render_template("index.html")
+
+@app.route("/garden/<username>")
+def view_garden(username):
+    user = User.query.get_or_404(username)
+    plots = Plot.query.filter_by(username=username).all()
+    garden = [[None]*3 for _ in range(3)]
+    for p in plots:
+        garden[p.row][p.col] = {"seed": p.seed, "growth": p.growth}
+    return render_template("garden.html", username=username, garden=garden, coins=user.coins, seed_data=seed_data)
+
+@app.route("/api/plant", methods=["POST"])
+def api_plant():
+    data = request.get_json()
+    user = User.query.get(data["username"])
+    plot = Plot.query.filter_by(username=user.username, row=data["row"], col=data["col"]).first()
+    seed = data["seed"]
+    cost = seed_data[seed]["cost"]
+    if user.coins < cost or plot.seed is not None:
+        return jsonify(success=False), 400
+    user.coins -= cost
+    plot.seed = seed
+    plot.growth = 0
+    db.session.commit()
+    return jsonify(success=True, coins=user.coins)
+
+@app.route("/api/water", methods=["POST"])
+def api_water():
+    data = request.get_json()
+    username = data["username"]
+    for p in Plot.query.filter_by(username=username):
+        if p.seed:
+            p.growth += 1
+    db.session.commit()
+    return jsonify(success=True)
+
+@app.route("/api/harvest", methods=["POST"])
+def api_harvest():
+    data = request.get_json()
+    user = User.query.get(data["username"])
+    plot = Plot.query.filter_by(username=user.username, row=data["row"], col=data["col"]).first()
+    if not plot.seed:
+        return jsonify(success=False), 400
+    sd = seed_data[plot.seed]
+    if plot.growth < sd["growth_time"]:
+        return jsonify(success=False), 400
+    user.coins += sd["cost"]
+    plot.seed = None
+    plot.growth = 0
+    db.session.commit()
+    return jsonify(success=True, coins=user.coins)
+
+@app.route("/api/shop", methods=["GET"])
+def api_shop():
+    return jsonify(seed_data)
+
+@app.route("/api/garden/<username>", methods=["GET"])
+def api_get_garden(username):
+    user = User.query.get_or_404(username)
+    plots = Plot.query.filter_by(username=username).all()
+    garden = [[None]*3 for _ in range(3)]
+    for p in plots:
+        garden[p.row][p.col] = {"seed": p.seed, "growth": p.growth}
+    return jsonify(garden=garden, coins=user.coins)
+
+if __name__ == "__main__":
+    app.run(debug=True)
