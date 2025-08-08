@@ -1,0 +1,54 @@
+document.addEventListener("DOMContentLoaded", () => {
+  const plantBtn = document.getElementById("plant-btn");
+  const waterBtn = document.getElementById("water-btn");
+  const harvestBtn = document.getElementById("harvest-btn");
+  const visitBtn = document.getElementById("visit-btn");
+  const seedSelect = document.getElementById("seed-select");
+  const coinsElem = document.getElementById("coins");
+  const visitInput = document.getElementById("visit-username");
+
+  let selectedCell = null;
+  document.querySelectorAll(".cell").forEach(cell => {
+    cell.addEventListener("click", () => {
+      document.querySelectorAll(".cell").forEach(c => c.classList.remove("selected"));
+      cell.classList.add("selected");
+      selectedCell = cell.dataset;
+    });
+  });
+
+  plantBtn.onclick = async () => {
+    if (!selectedCell) return alert("Select a plot first");
+    const res = await fetch("/api/plant", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ username: "{{ username }}", row: selectedCell.row, col: selectedCell.col, seed: seedSelect.value })
+    });
+    if (res.ok) window.location.reload();
+    else alert("Cannot plant that.");
+  };
+
+  waterBtn.onclick = async () => {
+    await fetch("/api/water", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ username: "{{ username }}" }) });
+    window.location.reload();
+  };
+
+  harvestBtn.onclick = async () => {
+    if (!selectedCell) return alert("Select a plot first");
+    const res = await fetch("/api/harvest", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ username: "{{ username }}", row: selectedCell.row, col: selectedCell.col })
+    });
+    if (res.ok) window.location.reload();
+    else alert("Cannot harvest yet.");
+  };
+
+  visitBtn.onclick = async () => {
+    const friend = visitInput.value;
+    const res = await fetch(`/api/garden/${friend}`);
+    if (!res.ok) return alert("User not found.");
+    const data = await res.json();
+    const div = document.getElementById("friend-garden");
+    let html = `<h4>${friend}'s Garden — Coins: ${data.coins}</h4>`;
+    html += "<pre>" + JSON.stringify(data.garden, null, 2) + "</pre>";
+    div.innerHTML = html;
+  };
+});
